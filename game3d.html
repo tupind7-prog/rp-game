@@ -1,0 +1,329 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>RP City 3D</title>
+    <style>
+        body { margin: 0; overflow: hidden; font-family: Arial; }
+        #info { position: absolute; bottom: 20px; left: 20px; color: white; background: rgba(0,0,0,0.7); padding: 10px; border-radius: 5px; z-index: 10; pointer-events: none; }
+    </style>
+</head>
+<body>
+    <div id="info">WASD - move | Mouse - look (hold left) | Space - jump | Shift - run</div>
+    <script src="https://cdn.jsdelivr.net/npm/three@0.157.0/build/three.min.js"></script>
+    <script>
+        var scene = new THREE.Scene();
+        scene.background = new THREE.Color(0x87CEEB);
+        scene.fog = new THREE.Fog(0x87CEEB, 200, 600);
+
+        var camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.1, 1000);
+        var renderer = new THREE.WebGLRenderer({ antialias: true });
+        renderer.setSize(window.innerWidth, window.innerHeight);
+        renderer.shadowMap.enabled = true;
+        renderer.shadowMap.type = THREE.PCFSoftShadowMap;
+        document.body.appendChild(renderer.domElement);
+
+        var sun = new THREE.DirectionalLight(0xFFF5E6, 1.5);
+        sun.position.set(150, 200, 100);
+        sun.castShadow = true;
+        sun.shadow.camera.left = -150; sun.shadow.camera.right = 150;
+        sun.shadow.camera.top = 150; sun.shadow.camera.bottom = -150;
+        sun.shadow.mapSize.width = 2048; sun.shadow.mapSize.height = 2048;
+        sun.shadow.bias = -0.0005;
+        scene.add(sun);
+        scene.add(new THREE.AmbientLight(0x8090A0));
+        scene.add(new THREE.HemisphereLight(0x87CEEB, 0x4a8c4a, 0.4));
+
+        var gCanvas = document.createElement('canvas');
+        gCanvas.width = 512; gCanvas.height = 512;
+        var g = gCanvas.getContext('2d');
+        g.fillStyle = '#4a8c3a'; g.fillRect(0, 0, 512, 512);
+        for (var i = 0; i < 3000; i++) {
+            g.fillStyle = 'rgb(' + (30+Math.random()*20) + ',' + (100+Math.random()*60) + ',' + (20+Math.random()*20) + ')';
+            g.fillRect(Math.random()*512, Math.random()*512, 2, 5+Math.random()*3);
+        }
+        var grassTex = new THREE.CanvasTexture(gCanvas);
+        grassTex.wrapS = THREE.RepeatWrapping; grassTex.wrapT = THREE.RepeatWrapping;
+        grassTex.repeat.set(25, 25);
+        var ground = new THREE.Mesh(new THREE.PlaneGeometry(800, 800), new THREE.MeshStandardMaterial({ map: grassTex, roughness: 0.9 }));
+        ground.rotation.x = -Math.PI/2;
+        ground.receiveShadow = true;
+        scene.add(ground);
+
+        var sidewalkMat = new THREE.MeshStandardMaterial({ color: 0xCCCCBB, roughness: 0.7 });
+        var asphaltMat = new THREE.MeshStandardMaterial({ color: 0x3a3a3a, roughness: 0.9 });
+        function addRoad(x, z, w, h) {
+            var sw = new THREE.Mesh(new THREE.PlaneGeometry(w+8, h+8), sidewalkMat);
+            sw.rotation.x = -Math.PI/2; sw.position.set(x, 0.02, z); sw.receiveShadow = true; scene.add(sw);
+            var r = new THREE.Mesh(new THREE.PlaneGeometry(w, h), asphaltMat);
+            r.rotation.x = -Math.PI/2; r.position.set(x, 0.03, z); r.receiveShadow = true; scene.add(r);
+        }
+        addRoad(0, 0, 18, 800); addRoad(0, 0, 800, 18);
+        addRoad(-150, 0, 18, 800); addRoad(150, 0, 18, 800);
+        addRoad(0, -150, 800, 18); addRoad(0, 150, 800, 18);
+        addRoad(-300, 0, 18, 800); addRoad(300, 0, 18, 800);
+        addRoad(0, -300, 800, 18); addRoad(0, 300, 800, 18);function addHouse(x, z, wc, rc, w, h, d) {
+    var house = new THREE.Group();
+    var wallMat = new THREE.MeshStandardMaterial({ color: wc, roughness: 0.6 });
+    var walls = new THREE.Mesh(new THREE.BoxGeometry(w, h, d), wallMat);
+    walls.position.y = h/2; walls.castShadow = true; walls.receiveShadow = true; house.add(walls);
+    var roofMat = new THREE.MeshStandardMaterial({ color: rc, roughness: 0.5 });
+    var roof = new THREE.Mesh(new THREE.ConeGeometry(w*0.75, h*0.35, 4), roofMat);
+    roof.position.y = h + h*0.17; roof.rotation.y = Math.PI/4; roof.castShadow = true; house.add(roof);
+    var door = new THREE.Mesh(new THREE.BoxGeometry(w*0.22, h*0.38, 0.5), new THREE.MeshStandardMaterial({ color: 0x6B3A2A, roughness: 0.5 }));
+    door.position.set(0, h*0.19, d/2+0.25); house.add(door);
+    var winMat = new THREE.MeshStandardMaterial({ color: 0xB0D4F1, roughness: 0.2, metalness: 0.3 });
+    for (var wx = -1; wx <= 1; wx += 2) {
+        var win = new THREE.Mesh(new THREE.BoxGeometry(w*0.18, h*0.18, 0.3), winMat);
+        win.position.set(wx*w*0.3, h*0.55, d/2+0.15); house.add(win);
+    }
+    var fenceMat = new THREE.MeshStandardMaterial({ color: 0xDDDDDD, roughness: 0.4 });
+    for (var f = -1; f <= 1; f += 0.25) {
+        var post = new THREE.Mesh(new THREE.CylinderGeometry(0.1, 0.15, 2.5, 8), fenceMat);
+        post.position.set(f*w*0.8, 1.25, d/2+2); house.add(post);
+    }
+    house.position.set(x, 0, z); scene.add(house);
+}
+
+var hColors = [[0xF5F0E0,0x5C3A1E],[0xE8DDD0,0x7B4A2A],[0xDFD5C5,0x6B3A1A],[0xF0E8D8,0x8B5A3A],[0xE5DBC8,0x4A2A1A],[0xFAF0E5,0x9B6A4A]];
+var hPos = [[-100,-100],[100,-100],[-100,100],[100,100],[0,-170],[0,170],[-170,0],[170,0],[-200,-200],[200,-200],[-200,200],[200,200],[-250,0],[250,0],[0,-250],[0,250],[120,-170],[-120,-170],[170,-120],[-170,-120],[120,170],[-120,170],[170,120],[-170,120]];
+for (var i = 0; i < hPos.length; i++) {
+    var hc = hColors[i % hColors.length];
+    addHouse(hPos[i][0], hPos[i][1], hc[0], hc[1], 14+Math.random()*14, 10+Math.random()*20, 10+Math.random()*12);
+}
+
+function addTree(x, z) {
+    var tree = new THREE.Group();
+    var trunkH = 8+Math.random()*6;
+    var trunk = new THREE.Mesh(new THREE.CylinderGeometry(0.4, 0.7, trunkH, 8), new THREE.MeshStandardMaterial({ color: 0x8B6914, roughness: 0.8 }));
+    trunk.position.y = trunkH/2; trunk.castShadow = true; trunk.receiveShadow = true; tree.add(trunk);
+    var leafMat = new THREE.MeshStandardMaterial({ color: 0x2D5A1E, roughness: 0.7 });
+    for (var l = 0; l < 3; l++) {
+        var leaves = new THREE.Mesh(new THREE.ConeGeometry(4.5-l*0.6, 5.5-l*0.3, 10), leafMat);
+        leaves.position.y = trunkH + 1.5 + l*3.5; leaves.castShadow = true; leaves.receiveShadow = true; tree.add(leaves);
+    }
+    tree.position.set(x, 0, z); scene.add(tree);
+}
+for (var t = 0; t < 60; t++) {
+    var tx = (Math.random()-0.5)*750, tz = (Math.random()-0.5)*750;
+    if (Math.abs(tx) < 15 && Math.abs(tz) < 400) tz += 30;
+    if (Math.abs(tz) < 15 && Math.abs(tx) < 400) tx += 30;
+    addTree(tx, tz);
+}function addCloud(x, y, z) {
+    var cloud = new THREE.Group();
+    var cMat = new THREE.MeshStandardMaterial({ color: 0xFFFFFF, roughness: 1, transparent: true, opacity: 0.85 });
+    for (var i = 0; i < 6; i++) {
+        var s = new THREE.Mesh(new THREE.SphereGeometry(4 + Math.random()*5, 8, 8), cMat);
+        s.position.set(Math.random()*10, Math.random()*3, Math.random()*10);
+        cloud.add(s);
+    }
+    cloud.position.set(x, y, z); scene.add(cloud);
+}
+for (var c = 0; c < 30; c++) addCloud(Math.random()*600-300, 50+Math.random()*60, Math.random()*600-300);
+
+var human = new THREE.Group();
+var body = new THREE.Mesh(new THREE.CylinderGeometry(1.4, 1.6, 4.5, 12), new THREE.MeshStandardMaterial({ color: 0x2255AA, roughness: 0.5 }));
+body.position.y = 4.5; body.castShadow = true; human.add(body);
+var head = new THREE.Mesh(new THREE.SphereGeometry(1.3, 16, 16), new THREE.MeshStandardMaterial({ color: 0xFFDDBB, roughness: 0.6 }));
+head.position.y = 7.8; head.castShadow = true; human.add(head);
+var hat = new THREE.Mesh(new THREE.CylinderGeometry(1.2, 1.4, 1.5, 12), new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.4 }));
+hat.position.y = 8.5; human.add(hat);
+
+var legGeo = new THREE.CylinderGeometry(0.6, 0.7, 4, 8);
+var legMat = new THREE.MeshStandardMaterial({ color: 0x2A2A44, roughness: 0.5 });
+human.add(new THREE.Mesh(legGeo, legMat)).position.set(-0.7, 1.5, 0);
+human.add(new THREE.Mesh(legGeo, legMat)).position.set(0.7, 1.5, 0);
+
+var armGeo = new THREE.CylinderGeometry(0.45, 0.5, 4.5, 8);
+var armMat = new THREE.MeshStandardMaterial({ color: 0xFFDDBB, roughness: 0.6 });
+human.add(new THREE.Mesh(armGeo, armMat)).position.set(-2.2, 5.5, 0);
+human.add(new THREE.Mesh(armGeo, armMat)).position.set(2.2, 5.5, 0);
+
+human.position.set(0, 2, 0);
+scene.add(human);var keys = {};
+        document.addEventListener('keydown', function(e) { keys[e.key.toLowerCase()] = true; e.preventDefault(); });
+        document.addEventListener('keyup', function(e) { keys[e.key.toLowerCase()] = false; });
+        var yaw = 0, vy = 0, jumping = false, mouseDown = false;
+        document.addEventListener('mousedown', function(e) { if (e.button === 0) mouseDown = true; });
+        document.addEventListener('mouseup', function() { mouseDown = false; });
+        document.addEventListener('mousemove', function(e) { if (mouseDown) yaw -= e.movementX * 0.003; });
+
+        function animate() {
+            requestAnimationFrame(animate);
+            var fwd = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
+            var rgt = new THREE.Vector3(Math.cos(yaw), 0, -Math.sin(yaw));
+            var spd = keys['shift'] ? 0.7 : 0.35;
+            if (keys['w']) { human.position.x += fwd.x*spd; human.position.z += fwd.z*spd; }
+            if (keys['s']) { human.position.x -= fwd.x*spd; human.position.z -= fwd.z*spd; }
+            if (keys['a']) { human.position.x += rgt.x*spd; human.position.z += rgt.z*spd; }
+            if (keys['d']) { human.position.x -= rgt.x*spd; human.position.z -= rgt.z*spd; }
+            if (keys[' '] && !jumping) { vy = 0.5; jumping = true; }
+            vy -= 0.02;
+            human.position.y += vy;
+            if (human.position.y <= 2) { human.position.y = 2; vy = 0; jumping = false; }
+            
+            var cd = 25;
+            var camX = human.position.x - Math.sin(yaw)*cd;
+            var camZ = human.position.z - Math.cos(yaw)*cd;
+            camera.position.set(camX, human.position.y+14, camZ);
+            camera.lookAt(human.position.x, human.position.y+4, human.position.z);
+            renderer.render(scene, camera);
+        }
+        animate();
+
+        window.addEventListener('resize', function() {
+            camera.aspect = window.innerWidth / window.innerHeight;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+        });
+        // BUILDING EDITOR
+var buildMode = false;
+var buildType = 'house';
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'b') { buildMode = !buildMode; document.getElementById('info').innerText = buildMode ? 'BUILD MODE: 1=House 2=Tree 3=Road | Click to place | B=exit' : 'WASD - move | Mouse - look | Space - jump | Shift - run'; }
+    if (buildMode && e.key === '1') buildType = 'house';
+    if (buildMode && e.key === '2') buildType = 'tree';
+    if (buildMode && e.key === '3') buildType = 'road';
+});
+
+document.addEventListener('click', function(e) {
+    if (!buildMode) return;
+    var px = human.position.x;
+    var pz = human.position.z;
+    var fwd = new THREE.Vector3(Math.sin(yaw), 0, Math.cos(yaw));
+    px += fwd.x * 15;
+    pz += fwd.z * 15;
+    
+    if (buildType === 'house') {
+        var hc = hColors[Math.floor(Math.random()*hColors.length)];
+        addHouse(px, pz, hc[0], hc[1], 14+Math.random()*10, 10+Math.random()*15, 10+Math.random()*10);
+    }
+    if (buildType === 'tree') {
+        addTree(px, pz);
+    }
+    if (buildType === 'road') {
+        addRoad(px, pz, 18, 800);
+    }
+});
+// VEHICLES
+var cars = [];
+function createCar(x, z, color) {
+    var car = new THREE.Group();
+    var body = new THREE.Mesh(new THREE.BoxGeometry(8, 3, 16), new THREE.MeshStandardMaterial({ color: color, roughness: 0.2, metalness: 0.7 }));
+    body.position.y = 3; body.castShadow = true; car.add(body);
+    var cabin = new THREE.Mesh(new THREE.BoxGeometry(7, 3, 7), new THREE.MeshStandardMaterial({ color: 0xAADDFF, roughness: 0.1, metalness: 0.5, transparent: true, opacity: 0.5 }));
+    cabin.position.set(0, 5.5, -1); car.add(cabin);
+    // Spoiler
+    var spoiler = new THREE.Mesh(new THREE.BoxGeometry(6, 0.5, 1.5), new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.3 }));
+    spoiler.position.set(0, 5.5, -7); car.add(spoiler);
+    // Headlights
+    var lGeo = new THREE.SphereGeometry(0.7, 8, 8);
+    car.add(new THREE.Mesh(lGeo, new THREE.MeshBasicMaterial({ color: 0xFFFF88 }))).position.set(-2.5, 3.5, 8);
+    car.add(new THREE.Mesh(lGeo, new THREE.MeshBasicMaterial({ color: 0xFFFF88 }))).position.set(2.5, 3.5, 8);
+    // Taillights
+    var tGeo = new THREE.BoxGeometry(1.5, 1, 0.5);
+    car.add(new THREE.Mesh(tGeo, new THREE.MeshBasicMaterial({ color: 0xFF0000 }))).position.set(-2.5, 3.5, -8);
+    car.add(new THREE.Mesh(tGeo, new THREE.MeshBasicMaterial({ color: 0xFF0000 }))).position.set(2.5, 3.5, -8);
+    // Wheels
+    var whGeo = new THREE.CylinderGeometry(1.8, 1.8, 1.5, 16);
+    var whMat = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.9 });
+    var whPos = [[-4.5, 1.8, 6],[4.5, 1.8, 6],[-4.5, 1.8, -6],[4.5, 1.8, -6]];
+    whPos.forEach(function(p) {
+        var w = new THREE.Mesh(whGeo, whMat);
+        w.rotation.z = Math.PI/2; w.castShadow = true; w.position.set(p[0], p[1], p[2]); car.add(w);
+    });
+    car.position.set(x, 0, z);
+    scene.add(car);
+    cars.push(car);
+    return car;
+}
+
+createCar(40, -40, 0xFF1A1A);
+createCar(-50, 50, 0x1A1AFF);
+createCar(60, 30, 0xFF6600);
+createCar(-30, -60, 0x1AFF1A);
+createCar(0, 70, 0xFF1AFF);
+createCar(80, -80, 0xFFD700);
+createCar(-80, 80, 0x00CCCC);
+
+var currentCar = null;
+var inCar = false;
+
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'e' && !buildMode && !deleteMode) {
+        if (inCar) {
+            human.position.set(currentCar.position.x + 10, 2, currentCar.position.z);
+            human.visible = true;
+            inCar = false;
+            currentCar = null;
+            document.getElementById('info').innerText = 'WASD - move | Mouse - look | Space - jump | Shift - run';
+        } else {
+            var closest = null;
+            var closestDist = 12;
+            cars.forEach(function(car) {
+                var dist = human.position.distanceTo(car.position);
+                if (dist < closestDist) { closestDist = dist; closest = car; }
+            });
+            if (closest) {
+                currentCar = closest;
+                human.visible = false;
+                inCar = true;
+                document.getElementById('info').innerText = 'CAR: WASD - drive | E - exit';
+            }
+        }
+    }
+});
+
+var oldAnimate = animate;
+animate = function() {
+    oldAnimate();
+    if (inCar && currentCar) {
+        var spd = 0;
+        if (keys['w']) spd = 1.5;
+        if (keys['s']) spd = -0.6;
+        if (keys['a']) currentCar.rotation.y += 0.04;
+        if (keys['d']) currentCar.rotation.y -= 0.04;
+        var fwd = new THREE.Vector3(Math.sin(currentCar.rotation.y), 0, Math.cos(currentCar.rotation.y));
+        currentCar.position.x += fwd.x * spd;
+        currentCar.position.z += fwd.z * spd;
+        human.position.copy(currentCar.position);
+        camera.position.set(currentCar.position.x - Math.sin(yaw)*30, currentCar.position.y+18, currentCar.position.z - Math.cos(yaw)*30);
+        camera.lookAt(currentCar.position.x, currentCar.position.y+5, currentCar.position.z);
+    }
+};
+// DELETE MODE (простой — удаляет ближайший объект)
+var deleteMode = false;
+document.addEventListener('keydown', function(e) {
+    if (e.key === 'x') { 
+        deleteMode = !deleteMode; 
+        buildMode = false;
+        document.getElementById('info').innerText = deleteMode ? 'DELETE MODE: Click to remove nearest object | X=exit' : 'WASD - move | Mouse - look | Space - jump | Shift - run'; 
+    }
+    if (deleteMode && e.key === 'f') {
+        var closest = null;
+        var closestDist = 10;
+        scene.children.forEach(function(obj) {
+            if (obj !== ground && obj !== human && obj.type === 'Group') {
+                var dist = human.position.distanceTo(obj.position);
+                if (dist < closestDist) { closestDist = dist; closest = obj; }
+            }
+        });
+        if (closest) scene.remove(closest);
+    }
+});
+
+document.addEventListener('click', function(e) {
+    if (!deleteMode) return;
+    var closest = null;
+    var closestDist = 8;
+    scene.children.forEach(function(obj) {
+        if (obj !== ground && obj !== human && obj.type === 'Group') {
+            var dist = human.position.distanceTo(obj.position);
+            if (dist < closestDist) { closestDist = dist; closest = obj; }
+        }
+    });
+    if (closest) scene.remove(closest);
+});
+    </script>
+</body>
+</html>
