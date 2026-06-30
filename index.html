@@ -1,0 +1,143 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>RP Server</title>
+    <style>
+        body { font-family: Arial; background: #1a1a1a; color: white; display: flex; margin: 0; }
+        #panel { width: 280px; padding: 15px; background: #222; height: 100vh; }
+        #map { flex: 1; background: #2d2d2d; }
+        input, button { padding: 8px; margin: 5px 0; width: 100%; box-sizing: border-box; }
+        button { background: #4CAF50; color: white; border: none; cursor: pointer; }
+        #response { margin-top: 10px; padding: 10px; background: #333; font-size: 14px; }
+        #playersList { margin-top: 10px; font-size: 14px; }
+        h3 { margin: 15px 0 5px 0; }
+    </style>
+</head>
+<body>
+    <div id="panel">
+        <h2>RP Server</h2>
+        <h3>Register</h3>
+        <input id="regUser" placeholder="Nick">
+        <input id="regPass" placeholder="Password" type="password">
+        <button onclick="reg()">Register</button>
+        <h3>Login</h3>
+        <input id="loginUser" placeholder="Nick">
+        <input id="loginPass" placeholder="Password" type="password">
+        <button onclick="login()">Login</button>
+        <div id="response"></div>
+        <h3>Players</h3>
+        <div id="playersList"></div>
+        <p style="font-size:12px;color:#888;">Arrow keys or WASD to move</p>
+    </div>
+    <div id="map">
+        <canvas id="mapCanvas"></canvas>
+    </div><script>
+        var canvas = document.getElementById('mapCanvas');
+        var ctx = canvas.getContext('2d');
+        
+        function resize() {
+            canvas.width = window.innerWidth - 280;
+            canvas.height = window.innerHeight;
+        }
+        resize();
+        window.onresize = resize;
+
+        var myX = 200;
+        var myY = 200;
+        var loggedIn = false;
+        var myName = '';
+
+        function drawMap() {
+            ctx.fillStyle = '#2d2d2d';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            ctx.strokeStyle = '#444';
+            ctx.lineWidth = 40;
+            ctx.beginPath();
+            ctx.moveTo(0, canvas.height / 2);
+            ctx.lineTo(canvas.width, canvas.height / 2);
+            ctx.stroke();
+            ctx.beginPath();
+            ctx.moveTo(canvas.width / 2, 0);
+            ctx.lineTo(canvas.width / 2, canvas.height);
+            ctx.stroke();
+
+            ctx.fillStyle = '#3a3a3a';
+            ctx.fillRect(50, 50, 100, 100);
+            ctx.fillRect(canvas.width - 150, 50, 100, 100);
+            ctx.fillRect(50, canvas.height - 150, 100, 100);
+            ctx.fillRect(canvas.width - 150, canvas.height - 150, 100, 100);
+
+            if (loggedIn) {
+                ctx.fillStyle = '#4CAF50';
+                ctx.beginPath();
+                ctx.arc(myX, myY, 12, 0, Math.PI * 2);
+                ctx.fill();
+            }
+        }
+
+        setInterval(drawMap, 100);
+
+        function handleKey(e) {
+            if (!loggedIn) return;
+            var speed = 5;
+            var key = e.key;
+            if (key === 'ArrowUp' || key === 'w') myY = myY - speed;
+            if (key === 'ArrowDown' || key === 's') myY = myY + speed;
+            if (key === 'ArrowLeft' || key === 'a') myX = myX - speed;
+            if (key === 'ArrowRight' || key === 'd') myX = myX + speed;
+            if (myX < 10) myX = 10;
+            if (myX > canvas.width - 10) myX = canvas.width - 10;
+            if (myY < 10) myY = 10;
+            if (myY > canvas.height - 10) myY = canvas.height - 10;
+        }
+
+        document.addEventListener('keydown', handleKey);
+
+        async function reg() {
+            var u = document.getElementById('regUser').value;
+            var p = document.getElementById('regPass').value;
+            var res = await fetch('/reg', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: u, password: p })
+            });
+            var data = await res.json();
+            document.getElementById('response').innerText = data.msg;
+            if (data.msg.indexOf('Registered') !== -1) {
+                loggedIn = true;
+                myName = u;
+                loadPlayers();
+            }
+        }
+
+        async function login() {
+            var u = document.getElementById('loginUser').value;
+            var p = document.getElementById('loginPass').value;
+            var res = await fetch('/login', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username: u, password: p })
+            });
+            var data = await res.json();
+            document.getElementById('response').innerText = data.msg;
+            if (data.msg.indexOf('Welcome') !== -1) {
+                loggedIn = true;
+                myName = u;
+                loadPlayers();
+            }
+        }
+
+        async function loadPlayers() {
+            var res = await fetch('/players');
+            var data = await res.json();
+            var html = '';
+            for (var i = 0; i < data.length; i++) {
+                html += data[i].username + ' - ' + data[i].money + ' money<br>';
+            }
+            document.getElementById('playersList').innerHTML = html;
+        }
+    </script>
+</body>
+</html>
